@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace EventManager.Models;
 
-public class EventModel
+public class EventModel : IValidatableObject
 {
     [Required]
     public int Id { get; set; }
@@ -17,4 +17,15 @@ public class EventModel
 
     [Required]
     public DateTime EndAt { get; set; }
+    
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (EndAt <= StartAt)
+        {
+            yield return new ValidationResult(
+                "Дата окончания не может быть раньше или равна дате начала",
+                new[] { nameof(EndAt) }
+            );
+        }
+    }
 }
