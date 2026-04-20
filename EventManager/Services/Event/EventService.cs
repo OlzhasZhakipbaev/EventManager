@@ -41,7 +41,6 @@ public class EventService : IEventService
         
         _event.Title = eventModel.Title;
         _event.Description = eventModel.Description;
-        _event.Id = eventModel.Id;
         _event.StartAt = eventModel.StartAt;
         _event.EndAt = eventModel.EndAt;
         

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EventManager.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("[controller]")]
 public class EventController : ControllerBase
 {
     private readonly IEventService _eventService;
@@ -33,23 +33,23 @@ public class EventController : ControllerBase
     public ApiResult<EventModel> GetEvent([FromRoute] int id)
     {
         var result = _eventService.GetEvent(id);
-        try
+
+        if (result is null)
+        {
+            return new ApiResult<EventModel>
+            {
+                Success = false,
+                StatusCode = HttpStatusCode.NotFound,
+                Message = $"Не удалось найти событие",
+                Data = null
+            };
+        }
         {
             return new ApiResult<EventModel>
             {
                 Success = true,
                 StatusCode = HttpStatusCode.OK,
                 Message = "Событие успешно получено",
-                Data = result
-            };
-        }
-        catch (Exception ex)
-        {
-            return new ApiResult<EventModel>
-            {
-                Success = false,
-                StatusCode = HttpStatusCode.NotFound,
-                Message = $"Не удалось найти номер здания по индексу: {ex.Message}",
                 Data = result
             };
         }
