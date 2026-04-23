@@ -1,5 +1,6 @@
 using System.Net;
 using EventManager.Code;
+using EventManager.DTOs;
 using EventManager.Models;
 using EventManager.Services.Event;
 using Microsoft.AspNetCore.Mvc;
@@ -81,9 +82,17 @@ public class EventsController : ControllerBase
     }
     
     [HttpPut("{id:int}")]
-    public ApiResult<bool> ChangeEvent([FromBody] EventModel eventModel)
+    public ApiResult<bool> ChangeEvent([FromRoute] int id, [FromBody] ChangeEventDto eventModelDto)
     {
-        var result = _eventService.ChangeEvent(eventModel.Id , eventModel);
+        var eventModel = new EventModel()
+        {
+            Title = eventModelDto.Title,
+            Description = eventModelDto.Description,
+            StartAt = eventModelDto.StartAt,
+            EndAt = eventModelDto.EndAt
+        };
+        
+        var result = _eventService.ChangeEvent(id , eventModel);
         if (result)
         {
             return new ApiResult<bool>()
