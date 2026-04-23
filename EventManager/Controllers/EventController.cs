@@ -81,9 +81,9 @@ public class EventsController : ControllerBase
     }
     
     [HttpPut("{id:int}")]
-    public ApiResult<bool> ChangeEvent([FromRoute] int id, [FromBody] EventModel eventModel)
+    public ApiResult<bool> ChangeEvent([FromBody] EventModel eventModel)
     {
-        var result = _eventService.ChangeEvent(id , eventModel);
+        var result = _eventService.ChangeEvent(eventModel.Id , eventModel);
         if (result)
         {
             return new ApiResult<bool>()
