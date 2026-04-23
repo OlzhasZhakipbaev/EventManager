@@ -8,11 +8,11 @@ namespace EventManager.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class EventController : ControllerBase
+public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
 
-    public EventController(IEventService eventService)
+    public EventsController(IEventService eventService)
     {
         _eventService = eventService;
     }
@@ -80,10 +80,10 @@ public class EventController : ControllerBase
             }
     }
     
-    [HttpPut]
-    public ApiResult<bool> ChangeEvent([FromBody] EventModel eventModel)
+    [HttpPut("{id:int}")]
+    public ApiResult<bool> ChangeEvent([FromRoute] int id, [FromBody] EventModel eventModel)
     {
-        var result = _eventService.ChangeEvent(eventModel.Id , eventModel);
+        var result = _eventService.ChangeEvent(id , eventModel);
         if (result)
         {
             return new ApiResult<bool>()
