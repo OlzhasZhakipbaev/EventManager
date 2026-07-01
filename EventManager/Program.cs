@@ -1,3 +1,4 @@
+using EventManager.Middlewares;
 using EventManager.Services.Event;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +14,8 @@ services.AddControllers();
 services.AddSingleton<IEventService, EventService>();
 
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
