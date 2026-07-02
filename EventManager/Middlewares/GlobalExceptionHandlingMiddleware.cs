@@ -19,7 +19,6 @@ public class GlobalExceptionHandlingMiddleware
     {
         try
         {
-            Console.WriteLine("Middleware started");
             await _next(httpContext);
         }
         catch (Exception ex)

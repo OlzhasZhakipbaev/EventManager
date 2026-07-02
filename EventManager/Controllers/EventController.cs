@@ -40,13 +40,6 @@ public class EventsController : ControllerBase
         if (result is null)
         {
             throw new NotFoundException("Не удалось найти событие");
-            /*return new ApiResult<EventModel>
-            {
-                Success = false,
-                StatusCode = HttpStatusCode.NotFound,
-                Message = $"Не удалось найти событие",
-                Data = null
-            };*/
         }
         {
             return new ApiResult<EventModel>
@@ -75,15 +68,7 @@ public class EventsController : ControllerBase
             }
 
             {
-
                 throw new ValidationException();
-                /*return new ApiResult<bool>()
-                {
-                    Success = false,
-                    StatusCode = HttpStatusCode.BadRequest,
-                    Message = "Событие не добавлено",
-                    Data = result
-                };*/
             }
     }
     
@@ -109,16 +94,8 @@ public class EventsController : ControllerBase
                 Data =  result
             };
         }
-
         {
             throw new NotFoundException("Событие не найдено");
-            /*return new ApiResult<bool>()
-            {
-                Success = false,
-                StatusCode = HttpStatusCode.NotFound,
-                Message = "Событие не найдено",
-                Data =  result
-            };*/
         }
     }
     
@@ -137,13 +114,7 @@ public class EventsController : ControllerBase
             };
         }
         {
-            return new ApiResult<bool>()
-            {
-                Success = false,
-                StatusCode = HttpStatusCode.NotFound,
-                Message = "Событие не найдено",
-                Data =  result
-            };
+            throw new NotFoundException("Событие не найдено");
         }
     }
 }
