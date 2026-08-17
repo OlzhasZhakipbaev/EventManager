@@ -19,6 +19,11 @@ public class GlobalExceptionHandlingMiddleware
     {
         try
         {
+            ThreadPool.GetMaxThreads(out int maxWorker, out int maxIo);
+            ThreadPool.GetAvailableThreads(out int availableWorker, out int availableIo);
+
+            Console.WriteLine($"Рабочие потоки: {maxWorker - availableWorker}/{maxWorker}");
+            Console.WriteLine($"I/O потоки: {maxIo - availableIo}/{maxIo}"); 
             await _next(httpContext);
         }
         catch (Exception ex)
