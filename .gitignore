@@ -10,3 +10,6 @@
 coverage*.json
 coverage*.xml
 TestResult.xml
+
+## Rider / IDE
+.idea/
