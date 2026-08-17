@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using EventManager.Code;
 using EventManager.DTOs;
+using EventManager.Exceptions;
 using EventManager.Models;
 using EventManager.Services.Event;
 using Microsoft.AspNetCore.Mvc;
@@ -19,14 +21,14 @@ public class EventsController : ControllerBase
     }
     
     [HttpGet]
-    public ApiResult<List<EventModel>> GetAll()
+    public ApiResult<PaginatedResultDto<EventModel>> GetAll([FromQuery] EventRequestDto eventRequest)
     {
-        return new ApiResult<List<EventModel>>
+        return new ApiResult<PaginatedResultDto<EventModel>>
         {
             Success = true,
             StatusCode = System.Net.HttpStatusCode.OK,
             Message = "События успешно получены",
-            Data = _eventService.GetEvents()
+            Data = _eventService.GetEvents(eventRequest)
         };
     }
     
@@ -37,13 +39,7 @@ public class EventsController : ControllerBase
 
         if (result is null)
         {
-            return new ApiResult<EventModel>
-            {
-                Success = false,
-                StatusCode = HttpStatusCode.NotFound,
-                Message = $"Не удалось найти событие",
-                Data = null
-            };
+            throw new NotFoundException("Не удалось найти событие");
         }
         {
             return new ApiResult<EventModel>
@@ -70,14 +66,9 @@ public class EventsController : ControllerBase
                     Data = result
                 };
             }
+
             {
-                return new ApiResult<bool>()
-                {
-                    Success = false,
-                    StatusCode = HttpStatusCode.BadRequest,
-                    Message = "Событие не добавлено",
-                    Data = result
-                };
+                throw new ValidationException();
             }
     }
     
@@ -104,13 +95,7 @@ public class EventsController : ControllerBase
             };
         }
         {
-            return new ApiResult<bool>()
-            {
-                Success = false,
-                StatusCode = HttpStatusCode.NotFound,
-                Message = "Событие не найдено",
-                Data =  result
-            };
+            throw new NotFoundException("Событие не найдено");
         }
     }
     
@@ -129,13 +114,7 @@ public class EventsController : ControllerBase
             };
         }
         {
-            return new ApiResult<bool>()
-            {
-                Success = false,
-                StatusCode = HttpStatusCode.NotFound,
-                Message = "Событие не найдено",
-                Data =  result
-            };
+            throw new NotFoundException("Событие не найдено");
         }
     }
 }

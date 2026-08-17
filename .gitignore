@@ -1,0 +1,12 @@
+## Build
+[Bb]in/
+[Oo]bj/
+
+## Test artifacts
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+TestResult.xml

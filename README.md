@@ -15,8 +15,7 @@ git clone - url
 cd EventManager
 dotnet build
 dotnet run
-dotnet test # запускает тесты
-```
+dotnet test -- запускает тесты
 
 После запуска Swagger доступен по адресу: http://localhost:{port}/swagger/index.html
 
