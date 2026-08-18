@@ -4,20 +4,23 @@ using EventManager.Code;
 using EventManager.DTOs;
 using EventManager.Exceptions;
 using EventManager.Models;
+using EventManager.Services.Booking;
 using EventManager.Services.Event;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventManager.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("events")]
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService;
 
-    public EventsController(IEventService eventService)
+    public EventsController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService;
+        _bookingService = bookingService;
     }
     
     [HttpGet]
@@ -116,5 +119,21 @@ public class EventsController : ControllerBase
         {
             throw new NotFoundException("Событие не найдено");
         }
+    }
+    
+    [HttpPost("{eventId:int}/book")]
+    public async Task<ApiResult<BookingModel>> BookEvent([FromRoute] int eventId)
+    {
+        var result = await _bookingService.CreateBookingAsync(eventId);
+        
+        Response.Headers.Location = $"/bookings/{result.Id}";
+        
+        return new ApiResult<BookingModel>()
+        {
+            Success = true,
+            StatusCode = HttpStatusCode.Accepted,
+            Message = $"Номер брони {result.Id}. Событие c id {result.EventId} забронировано со статусом {result.Status}",
+            Data =  result
+        };
     }
 }
