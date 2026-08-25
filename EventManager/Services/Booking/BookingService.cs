@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using EventManager.Exceptions;
 using EventManager.Models;
 using EventManager.Models.Enums;
@@ -25,13 +24,6 @@ public class BookingService : IBookingService
 
         lock (_bookings)
         {
-            var hasActive = _bookings.Any(x =>
-                x.EventId == eventId &&
-                x.Status != BookingStatus.Rejected);
-            
-            if (hasActive)
-                throw new ValidationException("Событие уже забронировано");
-            
             var booking = new BookingModel
             {
                 Id = Guid.NewGuid(),
