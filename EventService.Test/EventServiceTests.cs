@@ -20,7 +20,9 @@ public class EventServiceTests
                 Title = "Conference",
                 Description = "Desc1",
                 StartAt = new DateTime(2026, 1, 10),
-                EndAt = new DateTime(2026, 1, 11)
+                EndAt = new DateTime(2026, 1, 11),
+                TotalSeats = 10,
+                AvailableSeats = 10
             },
             new EventModel
             {
@@ -28,7 +30,9 @@ public class EventServiceTests
                 Title = "Meeting",
                 Description = "Desc2",
                 StartAt = new DateTime(2026, 2, 10),
-                EndAt = new DateTime(2026, 2, 11)
+                EndAt = new DateTime(2026, 2, 11),
+                TotalSeats = 10,
+                AvailableSeats = 10
             },
             new EventModel
             {
@@ -36,7 +40,9 @@ public class EventServiceTests
                 Title = "Workshop",
                 Description = "Desc3",
                 StartAt = new DateTime(2026, 3, 10),
-                EndAt = new DateTime(2026, 3, 11)
+                EndAt = new DateTime(2026, 3, 11),
+                TotalSeats = 10,
+                AvailableSeats = 10
             }
         });
 
@@ -54,7 +60,8 @@ public class EventServiceTests
             Title = "New Event",
             Description = "Description",
             StartAt = DateTime.Today,
-            EndAt = DateTime.Today.AddDays(1)
+            EndAt = DateTime.Today.AddDays(1),
+            TotalSeats = 20
         };
 
         var result = service.AddEvent(model);
@@ -62,6 +69,9 @@ public class EventServiceTests
         Assert.True(result);
 
         Assert.Equal(4, service.Events.Count);
+        var added = service.GetEvent(10);
+        Assert.Equal(20, added.TotalSeats);
+        Assert.Equal(20, added.AvailableSeats);
     }
     
     [Fact]

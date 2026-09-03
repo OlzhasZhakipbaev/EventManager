@@ -122,6 +122,7 @@ public class EventsController : ControllerBase
     }
     
     [HttpPost("{eventId:int}/book")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ApiResult<BookingModel>> BookEvent([FromRoute] int eventId)
     {
         var result = await _bookingService.CreateBookingAsync(eventId);

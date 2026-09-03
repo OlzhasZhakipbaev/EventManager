@@ -51,16 +51,29 @@ public class EventService : IEventService
     
     public bool AddEvent(EventModel eventModel)
     {
-        var _event = Events.FirstOrDefault(x => x.Id == eventModel.Id);
-        
-        if(_event is not null)
-        {
-            return false;
-        }
-        
-        Events.Add(eventModel);
+        return CreateEventCore(eventModel) is not null;
+    }
 
-        return true;
+    public Task<EventModel?> CreateEventAsync(EventModel createEvent)
+    {
+        return Task.FromResult(CreateEventCore(createEvent));
+    }
+
+    private EventModel? CreateEventCore(EventModel createEvent)
+    {
+        if (Events.Any(x => x.Id == createEvent.Id))
+            return null;
+
+        var created = EventModel.Create(
+            createEvent.Id,
+            createEvent.Title,
+            createEvent.Description,
+            createEvent.StartAt,
+            createEvent.EndAt,
+            createEvent.TotalSeats);
+
+        Events.Add(created);
+        return created;
     }
     
     public bool ChangeEvent(int id, EventModel eventModel)
