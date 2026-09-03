@@ -11,7 +11,6 @@ public class BookingService : IBookingService
     private readonly List<BookingModel> _bookings = [];
     private readonly IEventService _eventService;
     private readonly object _bookingLock = new();
-    private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
     private readonly ILogger _logger;
     
     public BookingService(IEventService eventService, ILogger<BookingService>? logger = null)
@@ -79,13 +78,10 @@ public class BookingService : IBookingService
         try
         {
             await Task.Delay(2000, stoppingToken);
-
-            await _processingSemaphore.WaitAsync(stoppingToken);
-            try
+            
+            var ev = _eventService.GetEvent(booking.EventId);
+            if (ev is null)
             {
-                var ev = _eventService.GetEvent(booking.EventId);
-                if (ev is null)
-                {
                     booking.Reject();
                     Update(booking);
                     _logger.LogWarning(
@@ -93,18 +89,20 @@ public class BookingService : IBookingService
                         booking.EventId,
                         booking.Id);
                     return;
-                }
-
-                booking.Confirm();
-                Update(booking);
             }
-            finally
-            {
-                _processingSemaphore.Release();
-            }
+            booking.Confirm();
+            Update(booking);
         }
         catch (OperationCanceledException)
         {
+            booking.Reject();
+            var ev = _eventService.GetEvent(booking.EventId);
+            if (ev is not null)
+            {
+                ev.ReleaseSeats();
+                _eventService.ChangeEvent(booking.EventId, ev);
+            }
+            Update(booking);
             throw;
         }
         catch (Exception ex)
