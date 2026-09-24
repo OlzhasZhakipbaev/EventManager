@@ -1,8 +1,6 @@
-using EventManager.DataAccess;
 using EventManager.Exceptions;
 using EventManager.Models;
-using EventManager.Models.Enums;
-using Microsoft.EntityFrameworkCore;
+using EventManager.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EventManager.Services.Booking;
@@ -11,12 +9,17 @@ public class BookingService : IBookingService
 {
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
-    private readonly AppDbContext _context;
+    private readonly IEventRepository _events;
+    private readonly IBookingRepository _bookings;
     private readonly ILogger _logger;
 
-    public BookingService(AppDbContext context, ILogger<BookingService>? logger = null)
+    public BookingService(
+        IEventRepository events,
+        IBookingRepository bookings,
+        ILogger<BookingService>? logger = null)
     {
-        _context = context;
+        _events = events;
+        _bookings = bookings;
         _logger = logger ?? NullLogger<BookingService>.Instance;
     }
 
@@ -25,7 +28,7 @@ public class BookingService : IBookingService
         await BookingLock.WaitAsync();
         try
         {
-            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == eventId);
+            var ev = await _events.GetByIdAsync(eventId);
             if (ev is null)
                 throw new NotFoundException("Событие не найдено");
 
@@ -33,8 +36,8 @@ public class BookingService : IBookingService
                 throw new NoAvailableSeatsException("Нет свободны мест для этого события");
 
             var booking = BookingModel.Create(eventId);
-            _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync();
+            await _bookings.AddAsync(booking);
+            await _bookings.SaveChangesAsync();
             return booking;
         }
         finally
@@ -45,24 +48,22 @@ public class BookingService : IBookingService
 
     public Task<BookingModel?> GetBookingByIdAsync(Guid bookingId)
     {
-        return _context.Bookings.FirstOrDefaultAsync(x => x.Id == bookingId);
+        return _bookings.GetByIdAsync(bookingId);
     }
 
-    public async Task<IReadOnlyList<BookingModel>> GetPendingAsync()
+    public Task<IReadOnlyList<BookingModel>> GetPendingAsync()
     {
-        return await _context.Bookings
-            .Where(x => x.Status == BookingStatus.Pending)
-            .ToListAsync();
+        return _bookings.GetPendingAsync();
     }
 
-    public async Task UpdateAsync(BookingModel booking)
+    public Task UpdateAsync(BookingModel booking)
     {
-        await _context.SaveChangesAsync();
+        return _bookings.SaveChangesAsync();
     }
 
     public async Task ProcessPendingAsync(CancellationToken ct)
     {
-        var pendingBookings = await GetPendingAsync();
+        var pendingBookings = await _bookings.GetPendingAsync(ct);
         foreach (var booking in pendingBookings)
             await ProcessBookingAsync(booking, ct);
     }
@@ -73,11 +74,11 @@ public class BookingService : IBookingService
         {
             await Task.Delay(2000, stoppingToken);
 
-            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId, stoppingToken);
+            var ev = await _events.GetByIdAsync(booking.EventId, stoppingToken);
             if (ev is null)
             {
                 booking.Reject();
-                await UpdateAsync(booking);
+                await _bookings.SaveChangesAsync(stoppingToken);
                 _logger.LogWarning(
                     "Событие {EventId} не найдено, резерв {BookingId} отклонено",
                     booking.EventId,
@@ -86,26 +87,26 @@ public class BookingService : IBookingService
             }
 
             booking.Confirm();
-            await UpdateAsync(booking);
+            await _bookings.SaveChangesAsync(stoppingToken);
         }
         catch (OperationCanceledException)
         {
             booking.Reject();
-            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId);
+            var ev = await _events.GetByIdAsync(booking.EventId);
             if (ev is not null)
                 ev.ReleaseSeats();
 
-            await UpdateAsync(booking);
+            await _bookings.SaveChangesAsync();
             throw;
         }
         catch (Exception ex)
         {
             booking.Reject();
-            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId);
+            var ev = await _events.GetByIdAsync(booking.EventId);
             if (ev is not null)
                 ev.ReleaseSeats();
 
-            await UpdateAsync(booking);
+            await _bookings.SaveChangesAsync();
             _logger.LogError(ex, "Unexpected error processing booking {BookingId}", booking.Id);
         }
     }

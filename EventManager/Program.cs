@@ -1,5 +1,6 @@
 using EventManager.DataAccess;
 using EventManager.Middlewares;
+using EventManager.Repositories;
 using EventManager.Services;
 using EventManager.Services.Booking;
 using EventManager.Services.Event;
@@ -15,6 +16,8 @@ services.AddHostedService<BookingProcessor>();
 services.AddControllers();
 services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+services.AddScoped<IEventRepository, EventRepository>();
+services.AddScoped<IBookingRepository, BookingRepository>();
 services.AddScoped<IEventService, EventService>();
 services.AddScoped<IBookingService, BookingService>();
 
@@ -23,7 +26,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
