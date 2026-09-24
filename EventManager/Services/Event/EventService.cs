@@ -1,40 +1,43 @@
+using EventManager.DataAccess;
 using EventManager.DTOs;
 using EventManager.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventManager.Services.Event;
 
 public class EventService : IEventService
 {
-    public List<EventModel> Events { get; set; } = [];
-    
-    public PaginatedResultDto<EventModel> GetEvents(EventRequestDto eventDto)
+    private readonly AppDbContext _context;
+
+    public EventService(AppDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<PaginatedResultDto<EventModel>> GetEventsAsync(EventRequestDto eventDto)
     {
         var page = Math.Max(eventDto.Page, 1);
         var pageSize = Math.Max(eventDto.PageSize, 1);
-        var query = Events.AsEnumerable();
-        
+        var query = _context.Events.AsQueryable();
+
         if (!string.IsNullOrEmpty(eventDto.Title))
         {
-            query = query.Where(x => x.Title.Contains(eventDto.Title, StringComparison.OrdinalIgnoreCase)).ToList();
+            var title = eventDto.Title.ToLower();
+            query = query.Where(x => x.Title.ToLower().Contains(title));
         }
 
         if (eventDto.From.HasValue)
-        {
-            query = query.Where(x => x.StartAt >= eventDto.From.Value).ToList();
-        }
-        
+            query = query.Where(x => x.StartAt >= eventDto.From.Value);
+
         if (eventDto.To.HasValue)
-        {
-            query = query.Where(x => x.EndAt <= eventDto.To.Value).ToList();
-        }
-        
-        var totalCount = query.Count();
-        
-        var items = query
+            query = query.Where(x => x.EndAt <= eventDto.To.Value);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
-        
+            .ToListAsync();
+
         return new PaginatedResultDto<EventModel>
         {
             TotalCount = totalCount,
@@ -44,65 +47,52 @@ public class EventService : IEventService
         };
     }
 
-    public EventModel GetEvent(int id)
+    public Task<EventModel?> GetEventAsync(int id)
     {
-        return Events.FirstOrDefault(x => x.Id == id);
-    }
-    
-    public bool AddEvent(EventModel eventModel)
-    {
-        return CreateEventCore(eventModel) is not null;
+        return _context.Events.FirstOrDefaultAsync(x => x.Id == id);
     }
 
-    public Task<EventModel?> CreateEventAsync(EventModel createEvent)
+    public async Task<bool> AddEventAsync(EventModel eventModel)
     {
-        return Task.FromResult(CreateEventCore(createEvent));
-    }
-
-    private EventModel? CreateEventCore(EventModel createEvent)
-    {
-        if (Events.Any(x => x.Id == createEvent.Id))
-            return null;
+        if (await _context.Events.AnyAsync(x => x.Id == eventModel.Id))
+            return false;
 
         var created = EventModel.Create(
-            createEvent.Id,
-            createEvent.Title,
-            createEvent.Description,
-            createEvent.StartAt,
-            createEvent.EndAt,
-            createEvent.TotalSeats);
+            eventModel.Id,
+            eventModel.Title,
+            eventModel.Description,
+            eventModel.StartAt,
+            eventModel.EndAt,
+            eventModel.TotalSeats);
 
-        Events.Add(created);
-        return created;
-    }
-    
-    public bool ChangeEvent(int id, EventModel eventModel)
-    {
-        var _event = Events.FirstOrDefault(x => x.Id == id);
-
-        if (_event is null)
-        {
-            return false;
-        }
-        
-        _event.Title = eventModel.Title;
-        _event.Description = eventModel.Description;
-        _event.StartAt = eventModel.StartAt;
-        _event.EndAt = eventModel.EndAt;
-        
+        _context.Events.Add(created);
+        await _context.SaveChangesAsync();
         return true;
     }
-    
-    public bool DeleteEvent(int id)
-    {
-        var findEvent = Events.FirstOrDefault(x => x.Id == id);
-        if(findEvent is null)
-        {
-            return false;
-        }
-        
-        Events.Remove(findEvent);
 
+    public async Task<bool> ChangeEventAsync(int id, EventModel eventModel)
+    {
+        var existing = await _context.Events.FirstOrDefaultAsync(x => x.Id == id);
+        if (existing is null)
+            return false;
+
+        existing.Title = eventModel.Title;
+        existing.Description = eventModel.Description;
+        existing.StartAt = eventModel.StartAt;
+        existing.EndAt = eventModel.EndAt;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteEventAsync(int id)
+    {
+        var existing = await _context.Events.FirstOrDefaultAsync(x => x.Id == id);
+        if (existing is null)
+            return false;
+
+        _context.Events.Remove(existing);
+        await _context.SaveChangesAsync();
         return true;
     }
 }

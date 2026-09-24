@@ -1,9 +1,15 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace EventManager.Models;
 
 public class EventModel : IValidatableObject
 {
+    [JsonConstructor]
+    private EventModel()
+    {
+    }
+
     [Required]
     public int Id { get; init; }
 
@@ -22,6 +28,9 @@ public class EventModel : IValidatableObject
     public int TotalSeats { get; set; }
 
     public int AvailableSeats { get; set; }
+
+    [JsonIgnore]
+    public ICollection<BookingModel> Bookings { get; set; } = [];
 
     public static EventModel Create(
         int id,

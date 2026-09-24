@@ -1,22 +1,17 @@
-using EventManager.Models;
-using EventManager.Services.Booking;
-using EventManager.Services.Event;
+using EventManager.DataAccess;
+using EventManager.Models.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventManager.Services;
 
 public class BookingProcessor : BackgroundService
 {
-    private readonly IBookingService _bookingStore;
-    private readonly IEventService _eventStore;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookingProcessor> _logger;
 
-    public BookingProcessor(
-        IBookingService bookingStore,
-        IEventService eventStore,
-        ILogger<BookingProcessor> logger)
+    public BookingProcessor(IServiceScopeFactory scopeFactory, ILogger<BookingProcessor> logger)
     {
-        _bookingStore = bookingStore;
-        _eventStore = eventStore;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -24,24 +19,39 @@ public class BookingProcessor : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var pendingBookings = _bookingStore.GetPending().ToList();
-            var tasks = pendingBookings.Select(booking => ProcessBookingAsync(booking, stoppingToken));
+            List<Guid> pendingIds;
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                pendingIds = await context.Bookings
+                    .Where(x => x.Status == BookingStatus.Pending)
+                    .Select(x => x.Id)
+                    .ToListAsync(stoppingToken);
+            }
+
+            var tasks = pendingIds.Select(id => ProcessBookingAsync(id, stoppingToken));
             await Task.WhenAll(tasks);
             await Task.Delay(2000, stoppingToken);
         }
     }
 
-    private async Task ProcessBookingAsync(BookingModel booking, CancellationToken stoppingToken)
+    private async Task ProcessBookingAsync(Guid bookingId, CancellationToken stoppingToken)
     {
+        await Task.Delay(2000, stoppingToken);
+
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var booking = await context.Bookings.FirstOrDefaultAsync(x => x.Id == bookingId, stoppingToken);
+        if (booking is null)
+            return;
+
         try
         {
-            await Task.Delay(2000, stoppingToken);
-
-            var ev = _eventStore.GetEvent(booking.EventId);
+            var ev = await context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId, stoppingToken);
             if (ev is null)
             {
                 booking.Reject();
-                _bookingStore.Update(booking);
+                await context.SaveChangesAsync(stoppingToken);
                 _logger.LogWarning(
                     "Событие {EventId} не найдено, резерв {BookingId} отклонен",
                     booking.EventId,
@@ -50,31 +60,26 @@ public class BookingProcessor : BackgroundService
             }
 
             booking.Confirm();
-            _bookingStore.Update(booking);
+            await context.SaveChangesAsync(stoppingToken);
         }
         catch (OperationCanceledException)
         {
-           booking.Reject();
-           var ev = _eventStore.GetEvent(booking.EventId);
-           if (ev is not null)
-           {
-               ev.ReleaseSeats();
-               _eventStore.ChangeEvent(booking.EventId, ev);
-           }
-           _bookingStore.Update(booking);
-           throw;
+            booking.Reject();
+            var ev = await context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId);
+            if (ev is not null)
+                ev.ReleaseSeats();
+
+            await context.SaveChangesAsync();
+            throw;
         }
         catch (Exception ex)
         {
             booking.Reject();
-            var ev = _eventStore.GetEvent(booking.EventId);
+            var ev = await context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId);
             if (ev is not null)
-            {
                 ev.ReleaseSeats();
-                _eventStore.ChangeEvent(booking.EventId, ev);
-            }
 
-            _bookingStore.Update(booking);
+            await context.SaveChangesAsync();
             _logger.LogError(ex, "Unexpected error processing booking {BookingId}", booking.Id);
         }
     }
