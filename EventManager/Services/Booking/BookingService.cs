@@ -1,76 +1,70 @@
+using EventManager.DataAccess;
 using EventManager.Exceptions;
 using EventManager.Models;
 using EventManager.Models.Enums;
-using EventManager.Services.Event;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EventManager.Services.Booking;
 
 public class BookingService : IBookingService
 {
-    private readonly List<BookingModel> _bookings = [];
-    private readonly IEventService _eventService;
-    private readonly object _bookingLock = new();
+    private static readonly SemaphoreSlim BookingLock = new(1, 1);
+
+    private readonly AppDbContext _context;
     private readonly ILogger _logger;
-    
-    public BookingService(IEventService eventService, ILogger<BookingService>? logger = null)
+
+    public BookingService(AppDbContext context, ILogger<BookingService>? logger = null)
     {
-        _eventService = eventService;
+        _context = context;
         _logger = logger ?? NullLogger<BookingService>.Instance;
     }
-    
-    public Task<BookingModel> CreateBookingAsync(int eventId)
-    {
-        lock (_bookingLock)
-        {
-            var ev = _eventService.GetEvent(eventId);
 
+    public async Task<BookingModel> CreateBookingAsync(int eventId)
+    {
+        await BookingLock.WaitAsync();
+        try
+        {
+            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == eventId);
             if (ev is null)
                 throw new NotFoundException("Событие не найдено");
 
             if (!ev.TryReserveSeats())
                 throw new NoAvailableSeatsException("Нет свободны мест для этого события");
 
-            _eventService.ChangeEvent(eventId, ev);
-
-            var booking = new BookingModel
-            {
-                Id = Guid.NewGuid(),
-                Status = BookingStatus.Pending,
-                CreatedAt = DateTime.UtcNow,
-                ProcessedAt = null,
-                EventId = eventId
-            };
-
-            _bookings.Add(booking);
-
-            return Task.FromResult(booking);
+            var booking = BookingModel.Create(eventId);
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
+            return booking;
+        }
+        finally
+        {
+            BookingLock.Release();
         }
     }
-    
+
     public Task<BookingModel?> GetBookingByIdAsync(Guid bookingId)
     {
-        var booking = _bookings.FirstOrDefault(x => x.Id == bookingId);
-        return Task.FromResult(booking);
-    }
-    
-    public IEnumerable<BookingModel> GetPending()
-    {
-        lock (_bookingLock)
-        {
-            return _bookings.Where(x => x.Status == BookingStatus.Pending).ToList();
-        }
+        return _context.Bookings.FirstOrDefaultAsync(x => x.Id == bookingId);
     }
 
-    public void Update(BookingModel booking)
+    public async Task<IReadOnlyList<BookingModel>> GetPendingAsync()
     {
+        return await _context.Bookings
+            .Where(x => x.Status == BookingStatus.Pending)
+            .ToListAsync();
+    }
+
+    public async Task UpdateAsync(BookingModel booking)
+    {
+        await _context.SaveChangesAsync();
     }
 
     public async Task ProcessPendingAsync(CancellationToken ct)
     {
-        var pendingBookings = GetPending().ToList();
-        var tasks = pendingBookings.Select(booking => ProcessBookingAsync(booking, ct));
-        await Task.WhenAll(tasks);
+        var pendingBookings = await GetPendingAsync();
+        foreach (var booking in pendingBookings)
+            await ProcessBookingAsync(booking, ct);
     }
 
     private async Task ProcessBookingAsync(BookingModel booking, CancellationToken stoppingToken)
@@ -78,44 +72,40 @@ public class BookingService : IBookingService
         try
         {
             await Task.Delay(2000, stoppingToken);
-            
-            var ev = _eventService.GetEvent(booking.EventId);
+
+            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId, stoppingToken);
             if (ev is null)
             {
-                    booking.Reject();
-                    Update(booking);
-                    _logger.LogWarning(
-                        "Событие {EventId} не найдено, резерв {BookingId} отклонено",
-                        booking.EventId,
-                        booking.Id);
-                    return;
+                booking.Reject();
+                await UpdateAsync(booking);
+                _logger.LogWarning(
+                    "Событие {EventId} не найдено, резерв {BookingId} отклонено",
+                    booking.EventId,
+                    booking.Id);
+                return;
             }
+
             booking.Confirm();
-            Update(booking);
+            await UpdateAsync(booking);
         }
         catch (OperationCanceledException)
         {
             booking.Reject();
-            var ev = _eventService.GetEvent(booking.EventId);
+            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId);
             if (ev is not null)
-            {
                 ev.ReleaseSeats();
-                _eventService.ChangeEvent(booking.EventId, ev);
-            }
-            Update(booking);
+
+            await UpdateAsync(booking);
             throw;
         }
         catch (Exception ex)
         {
             booking.Reject();
-            var ev = _eventService.GetEvent(booking.EventId);
+            var ev = await _context.Events.FirstOrDefaultAsync(x => x.Id == booking.EventId);
             if (ev is not null)
-            {
                 ev.ReleaseSeats();
-                _eventService.ChangeEvent(booking.EventId, ev);
-            }
 
-            Update(booking);
+            await UpdateAsync(booking);
             _logger.LogError(ex, "Unexpected error processing booking {BookingId}", booking.Id);
         }
     }

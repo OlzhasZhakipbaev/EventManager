@@ -1,26 +1,33 @@
+using EventManager.DataAccess;
 using EventManager.Middlewares;
 using EventManager.Services;
 using EventManager.Services.Booking;
 using EventManager.Services.Event;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var services = builder.Services;
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 services.AddHostedService<BookingProcessor>();
 services.AddControllers();
-services.AddSingleton<IEventService, EventService>();
-services.AddSingleton<IBookingService, BookingService>();
+services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+services.AddScoped<IEventService, EventService>();
+services.AddScoped<IBookingService, BookingService>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
+
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

@@ -22,119 +22,112 @@ public class EventsController : ControllerBase
         _eventService = eventService;
         _bookingService = bookingService;
     }
-    
+
     [HttpGet]
-    public ApiResult<PaginatedResultDto<EventModel>> GetAll([FromQuery] EventRequestDto eventRequest)
+    public async Task<ApiResult<PaginatedResultDto<EventModel>>> GetAll([FromQuery] EventRequestDto eventRequest)
     {
         return new ApiResult<PaginatedResultDto<EventModel>>
         {
             Success = true,
-            StatusCode = System.Net.HttpStatusCode.OK,
+            StatusCode = HttpStatusCode.OK,
             Message = "События успешно получены",
-            Data = _eventService.GetEvents(eventRequest)
+            Data = await _eventService.GetEventsAsync(eventRequest)
         };
     }
-    
+
     [HttpGet("{id:int}")]
-    public ApiResult<EventModel> GetEvent([FromRoute] int id)
+    public async Task<ApiResult<EventModel>> GetEvent([FromRoute] int id)
     {
-        var result = _eventService.GetEvent(id);
+        var result = await _eventService.GetEventAsync(id);
 
         if (result is null)
-        {
             throw new NotFoundException("Не удалось найти событие");
-        }
+
+        return new ApiResult<EventModel>
         {
-            return new ApiResult<EventModel>
+            Success = true,
+            StatusCode = HttpStatusCode.OK,
+            Message = "Событие успешно получено",
+            Data = result
+        };
+    }
+
+    [HttpPost]
+    public async Task<ApiResult<bool>> AddEvent([FromBody] EventModel eventModel)
+    {
+        var result = await _eventService.AddEventAsync(eventModel);
+        if (result)
+        {
+            return new ApiResult<bool>
             {
                 Success = true,
-                StatusCode = HttpStatusCode.OK,
-                Message = "Событие успешно получено",
+                StatusCode = HttpStatusCode.Created,
+                Message = "Событие успешно добавлено",
                 Data = result
             };
         }
-    }
-    
-    [HttpPost]
-    public ApiResult<bool> AddEvent([FromBody] EventModel eventModel)
-    {
-            var result = _eventService.AddEvent(eventModel);
-            if (result)
-            {
-                return new ApiResult<bool>()
-                {
-                    Success = true,
-                    StatusCode = HttpStatusCode.Created,
-                    Message = "Событие успешно добавлено",
-                    Data = result
-                };
-            }
 
-            {
-                throw new ValidationException();
-            }
+        throw new ValidationException();
     }
-    
+
     [HttpPut("{id:int}")]
-    public ApiResult<bool> ChangeEvent([FromRoute] int id, [FromBody] ChangeEventDto eventModelDto)
+    public async Task<ApiResult<bool>> ChangeEvent([FromRoute] int id, [FromBody] ChangeEventDto eventModelDto)
     {
-        var eventModel = new EventModel()
-        {
-            Title = eventModelDto.Title,
-            Description = eventModelDto.Description,
-            StartAt = eventModelDto.StartAt,
-            EndAt = eventModelDto.EndAt
-        };
-        
-        var result = _eventService.ChangeEvent(id , eventModel);
+        var eventModel = EventModel.Create(
+            id,
+            eventModelDto.Title,
+            eventModelDto.Description,
+            eventModelDto.StartAt,
+            eventModelDto.EndAt,
+            1);
+
+        var result = await _eventService.ChangeEventAsync(id, eventModel);
         if (result)
         {
-            return new ApiResult<bool>()
+            return new ApiResult<bool>
             {
                 Success = true,
                 StatusCode = HttpStatusCode.OK,
                 Message = "Событие изменено",
-                Data =  result
+                Data = result
             };
         }
-        {
-            throw new NotFoundException("Событие не найдено");
-        }
+
+        throw new NotFoundException("Событие не найдено");
     }
-    
+
     [HttpDelete("{id:int}")]
-    public ApiResult<bool> DeleteEvent([FromRoute] int id)
+    public async Task<ApiResult<bool>> DeleteEvent([FromRoute] int id)
     {
-        var result = _eventService.DeleteEvent(id);
+        var result = await _eventService.DeleteEventAsync(id);
         if (result)
         {
-            return new ApiResult<bool>()
+            return new ApiResult<bool>
             {
                 Success = true,
                 StatusCode = HttpStatusCode.OK,
                 Message = "Событие удалено",
-                Data =  result
+                Data = result
             };
         }
-        {
-            throw new NotFoundException("Событие не найдено");
-        }
+
+        throw new NotFoundException("Событие не найдено");
     }
-    
+
     [HttpPost("{eventId:int}/book")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ApiResult<BookingModel>> BookEvent([FromRoute] int eventId)
     {
         var result = await _bookingService.CreateBookingAsync(eventId);
-        
+
         Response.Headers.Location = $"/bookings/{result.Id}";
-        
-        return new ApiResult<BookingModel>()
+
+        return new ApiResult<BookingModel>
         {
             Success = true,
             StatusCode = HttpStatusCode.Accepted,
             Message = $"Номер брони {result.Id}. Событие c id {result.EventId} забронировано со статусом {result.Status}",
-            Data =  result
+            Data = result
         };
     }
 }

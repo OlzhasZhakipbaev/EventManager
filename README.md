@@ -1,12 +1,34 @@
 # EventManager API
 
-REST API для управления событиями и бронированиями. Данные хранятся в памяти приложения.
+REST API для управления событиями и бронированиями. Данные хранятся в PostgreSQL (Entity Framework Core).
 
 ## Стек
 
 - .NET 8
 - ASP.NET Core Web API
 - Swagger / OpenAPI
+- PostgreSQL + EF Core (Npgsql)
+- InMemory-провайдер EF Core в юнит-тестах
+
+## Требования
+
+Для запуска приложения нужен **PostgreSQL** (локально или в Docker). Тесты базу не требуют — они используют InMemory.
+
+## Строка подключения
+
+Задаётся в `EventManager/appsettings.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username=postgres;Password=postgres"
+  }
+}
+```
+
+Подставьте хост, порт, имя БД и учётные данные своей установки. Через Docker: поднимите сервис `events-db` из `docker-compose.yml` (порт `5432`, БД `eventapi`).
+
+Схема создаётся **автоматически при старте** (`EnsureCreated` в `Program.cs`): если таблиц `Events` и `Bookings` нет — EF Core создаст их. Повторный запуск схему не меняет. `EnsureCreated` не совместим с миграциями.
 
 ## Запуск
 
@@ -14,11 +36,13 @@ REST API для управления событиями и бронирован�
 git clone - url
 cd EventManager
 dotnet build
-dotnet run
+dotnet run --project EventManager --launch-profile http
 dotnet test
 ```
 
-После запуска Swagger доступен по адресу: http://localhost:5164/swagger/index.html
+После запуска Swagger: http://localhost:5164/swagger/index.html
+
+Юнит-тесты регистрируют `AppDbContext` через `UseInMemoryDatabase` (у каждого теста своё имя БД) и не ходят в PostgreSQL.
 
 ## Эндпоинты событий
 
@@ -94,17 +118,16 @@ dotnet test
 
 | Примитив | Где | Зачем |
 |----------|-----|--------|
-| `lock (_bookingLock)` | `BookingService.CreateBookingAsync` | Критическая секция «проверка мест + резерв + запись брони». Без lock два потока могут одновременно увидеть `AvailableSeats > 0` и создать больше броней, чем мест. |
-| `SemaphoreSlim(1, 1)` | `BookingProcessor` / `ProcessBookingAsync` | Асинхронный аналог mutex для записи в хранилище. `lock` нельзя использовать с `await` внутри блока; задержки (`Task.Delay`) идут **до** захвата семафора и выполняются параллельно. |
+| `static SemaphoreSlim` | `BookingService.CreateBookingAsync` | Критическая секция «проверка мест + резерв + запись брони». `lock` нельзя использовать с `await`; семафор static, потому что сервис scoped. |
 
 `GetBookingByIdAsync` не блокируется — это только чтение.
 
 ## Фоновая обработка
 
-`BookingProcessor` (`BackgroundService`) обрабатывает заявки **параллельно** (`Task.WhenAll`):
+`BookingProcessor` (`BackgroundService`) — синглтон: `DbContext` берёт через `IServiceScopeFactory` (отдельный scope на список Pending и на каждую бронь). Заявки обрабатываются **параллельно** (`Task.WhenAll`):
 
-1. выбирает все брони со статусом `Pending`;
-2. для каждой запускает `ProcessBookingAsync`: сначала `Task.Delay` (2 с, имитация внешней системы), затем захват `SemaphoreSlim`;
+1. выбирает id броней со статусом `Pending`;
+2. для каждой запускает `ProcessBookingAsync` со своим `DbContext` (`Task.Delay` 2 с — имитация внешней системы);
 3. если событие есть — `Confirm()` и сохранение; если событие удалено или произошла ошибка — `Reject()`, место возвращается через `ReleaseSeats()`.
 
 Эндпоинт создания отвечает сразу (**202 Accepted**), обработка идёт асинхронно. Через несколько секунд `GET /bookings/{id}` возвращает уже изменённый статус.
@@ -152,12 +175,12 @@ GET /bookings/{bookingId}
 
 Событие на **5** мест, **20** одновременных `POST /events/1/book`:
 
-1. `CreateBookingAsync` берёт `_bookingLock` на всю пару «проверить `AvailableSeats` + `TryReserveSeats` + сохранить бронь».
+1. `CreateBookingAsync` берёт `SemaphoreSlim` на пару «проверить `AvailableSeats` + `TryReserveSeats` + `SaveChangesAsync`».
 2. Ровно **5** запросов получают **202 Accepted** (уникальные `Id`, статус `Pending`).
 3. Остальные **15** получают **409 Conflict** (`NoAvailableSeatsException`, сообщение `No available seats for this event`).
 4. У события `AvailableSeats = 0`.
 
-Без `lock` несколько потоков могли бы прочитать одно и то же значение свободных мест и создать больше пяти броней.
+Без семафора несколько потоков могли бы прочитать одно и то же значение свободных мест и создать больше пяти броней.
 
 ## Формат запроса для добавления события
 
@@ -212,4 +235,4 @@ GET /events?page=2&pageSize=20&title=Конференция
 
 ## Важно
 
-Данные хранятся в памяти — при перезапуске приложения все события и брони удаляются.
+Данные хранятся в PostgreSQL и остаются после перезапуска приложения.
