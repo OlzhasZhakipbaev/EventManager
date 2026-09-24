@@ -8,10 +8,12 @@ public class EventConfiguration : IEntityTypeConfiguration<EventModel>
 {
     public void Configure(EntityTypeBuilder<EventModel> builder)
     {
-        builder.ToTable("Events");
+        builder.ToTable("events");
 
         builder.HasKey(e => e.Id);
-        builder.Property(e => e.Id).ValueGeneratedNever();
+        builder.Property(e => e.Id)
+            .HasColumnName("id")
+            .ValueGeneratedNever();
 
         builder.Property(e => e.Title)
             .IsRequired()

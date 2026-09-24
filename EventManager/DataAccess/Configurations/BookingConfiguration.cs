@@ -8,12 +8,16 @@ public class BookingConfiguration : IEntityTypeConfiguration<BookingModel>
 {
     public void Configure(EntityTypeBuilder<BookingModel> builder)
     {
-        builder.ToTable("Bookings");
+        builder.ToTable("bookings");
 
         builder.HasKey(b => b.Id);
-        builder.Property(b => b.Id).ValueGeneratedNever();
+        builder.Property(b => b.Id)
+            .HasColumnName("id")
+            .ValueGeneratedNever();
 
-        builder.Property(b => b.EventId).IsRequired();
+        builder.Property(b => b.EventId)
+            .HasColumnName("event_id")
+            .IsRequired();
 
         builder.Property(b => b.Status)
             .IsRequired()
