@@ -246,3 +246,16 @@ GET /events?page=2&pageSize=20&title=Конференция
 ## Важно
 
 Данные хранятся в PostgreSQL и остаются после перезапуска приложения.
+
+## Архитектура
+
+
+Приложение реорганизовано по принципам чистой архитектуры и разделено на четыре отдельных проекта:
+
+```
+EventManager.sln
+├── EventManager.Domain          # доменные сущности (Event, Booking), доменные исключения — ни от чего не зависит
+├── EventManager.Application     # use cases (EventService, BookingService), интерфейсы портов, DTO — зависит только от Domain
+├── EventManager.Infrastructure  # DbContext, репозитории, BookingProcessor — зависит от Application и Domain
+└── EventManager.Presentation    # Web API, контроллеры, composition root, точка входа — зависит от Application и Infrastructure
+```

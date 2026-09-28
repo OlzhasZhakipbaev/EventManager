@@ -1,7 +1,7 @@
-using EventManager.DataAccess;
-using EventManager.Models;
-using EventManager.Models.Enums;
-using EventManager.Repositories;
+using Infrastructure.DataAccess;
+using Domain.Models;
+using Domain.Models.Enums;
+using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

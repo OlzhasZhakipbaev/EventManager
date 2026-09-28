@@ -1,8 +1,8 @@
 using System.Net;
 using EventManager.Code;
-using EventManager.Exceptions;
-using EventManager.Models;
-using EventManager.Services.Booking;
+using Domain.Exceptions;
+using Domain.Models;
+using Application.Services.Booking;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventManager.Controllers;

@@ -1,10 +1,11 @@
-using EventManager.DataAccess;
-using EventManager.Exceptions;
-using EventManager.Models;
-using EventManager.Models.Enums;
-using EventManager.Repositories;
-using EventManager.Services.Booking;
-using EventManager.Services.Event;
+using Application.Repositories;
+using Infrastructure.DataAccess;
+using Domain.Exceptions;
+using Domain.Models;
+using Domain.Models.Enums;
+using Infrastructure.Repositories;
+using Application.Services.Booking;
+using Application.Services.Event;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -31,8 +32,8 @@ public class BookingServiceTests
             options.UseInMemoryDatabase(dbName));
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
-        services.AddScoped<IEventService, EventManager.Services.Event.EventService>();
-        services.AddScoped<IBookingService, EventManager.Services.Booking.BookingService>();
+        services.AddScoped<IEventService, Application.Services.Event.EventService>();
+        services.AddScoped<IBookingService, BookingService>();
 
         var provider = services.BuildServiceProvider();
 
