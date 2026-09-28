@@ -2,6 +2,7 @@ using EventManager.DataAccess;
 using EventManager.Exceptions;
 using EventManager.Models;
 using EventManager.Models.Enums;
+using EventManager.Repositories;
 using EventManager.Services.Booking;
 using EventManager.Services.Event;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,8 @@ public class BookingServiceTests
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase(dbName));
+        services.AddScoped<IEventRepository, EventRepository>();
+        services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IEventService, EventManager.Services.Event.EventService>();
         services.AddScoped<IBookingService, EventManager.Services.Booking.BookingService>();
 

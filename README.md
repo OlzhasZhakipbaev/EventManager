@@ -9,10 +9,11 @@ REST API для управления событиями и бронирован�
 - Swagger / OpenAPI
 - PostgreSQL + EF Core (Npgsql)
 - InMemory-провайдер EF Core в юнит-тестах
+- Testcontainers + PostgreSQL в интеграционных тестах
 
 ## Требования
 
-Для запуска приложения нужен **PostgreSQL** (локально или в Docker). Тесты базу не требуют — они используют InMemory.
+Для запуска приложения нужен **PostgreSQL** (локально или в Docker). Юнит-тесты базу не требуют (InMemory). **Интеграционные тесты** (`EventApi.IntegrationTests`) поднимают PostgreSQL через Testcontainers — для них должен быть запущен **Docker**.
 
 ## Строка подключения
 
@@ -28,7 +29,15 @@ REST API для управления событиями и бронирован�
 
 Подставьте хост, порт, имя БД и учётные данные своей установки. Через Docker: поднимите сервис `events-db` из `docker-compose.yml` (порт `5432`, БД `eventapi`).
 
-Схема создаётся **автоматически при старте** (`EnsureCreated` в `Program.cs`): если таблиц `Events` и `Bookings` нет — EF Core создаст их. Повторный запуск схему не меняет. `EnsureCreated` не совместим с миграциями.
+Схема БД управляется **миграциями EF Core** (`events`, `bookings`, FK `event_id`). При старте приложения вызывается `Database.Migrate()` — недостающие миграции применяются сами, руками SQL писать не нужно.
+
+```bash
+# создать новую миграцию
+dotnet ef migrations add <Name> --project EventManager --startup-project EventManager
+
+# применить миграции (то же самое делает запуск приложения)
+dotnet ef database update --project EventManager --startup-project EventManager
+```
 
 ## Запуск
 
@@ -42,7 +51,8 @@ dotnet test
 
 После запуска Swagger: http://localhost:5164/swagger/index.html
 
-Юнит-тесты регистрируют `AppDbContext` через `UseInMemoryDatabase` (у каждого теста своё имя БД) и не ходят в PostgreSQL.
+- Юнит-тесты (`EventService.Test`): `UseInMemoryDatabase`, PostgreSQL не нужен.
+- Интеграционные тесты (`EventApi.IntegrationTests`): один контейнер Testcontainers, перед каждым тестом `EnsureDeleted()` + `Migrate()`. Нужен Docker.
 
 ## Эндпоинты событий
 

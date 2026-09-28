@@ -1,6 +1,7 @@
 using EventManager.DataAccess;
 using EventManager.DTOs;
 using EventManager.Models;
+using EventManager.Repositories;
 using EventManager.Services.Event;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,7 @@ public class EventServiceTests
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase(dbName));
+        services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IEventService, EventManager.Services.Event.EventService>();
 
         var provider = services.BuildServiceProvider();
