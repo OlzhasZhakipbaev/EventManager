@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using EventManager.Exceptions;
+using Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventManager.Middlewares;

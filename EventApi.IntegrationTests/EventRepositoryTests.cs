@@ -1,6 +1,6 @@
-using EventManager.DataAccess;
-using EventManager.Models;
-using EventManager.Repositories;
+using Infrastructure.DataAccess;
+using Domain.Models;
+using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

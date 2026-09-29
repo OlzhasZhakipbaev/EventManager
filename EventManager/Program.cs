@@ -1,9 +1,12 @@
-using EventManager.DataAccess;
+using Application;
+using Application.Repositories;
+using Infrastructure.DataAccess;
 using EventManager.Middlewares;
-using EventManager.Repositories;
-using EventManager.Services;
-using EventManager.Services.Booking;
-using EventManager.Services.Event;
+using Infrastructure.Repositories;
+using Application.Services;
+using Application.Services.Booking;
+using Application.Services.Event;
+using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,12 +17,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 services.AddHostedService<BookingProcessor>();
 services.AddControllers();
-services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-services.AddScoped<IEventRepository, EventRepository>();
-services.AddScoped<IBookingRepository, BookingRepository>();
-services.AddScoped<IEventService, EventService>();
-services.AddScoped<IBookingService, BookingService>();
+services.AddInfrastructure(builder.Configuration);
+services.AddApplication();
 
 var app = builder.Build();
 

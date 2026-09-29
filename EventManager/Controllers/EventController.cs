@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
+using Application.DTOs;
 using EventManager.Code;
-using EventManager.DTOs;
-using EventManager.Exceptions;
-using EventManager.Models;
-using EventManager.Services.Booking;
-using EventManager.Services.Event;
+using Application.DTOs;
+using Domain.Exceptions;
+using Domain.Models;
+using Application.Services.Booking;
+using Application.Services.Event;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventManager.Controllers;
