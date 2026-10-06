@@ -1,12 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
+using System.Security.Claims;
 using Application.DTOs;
 using EventManager.Code;
-using Application.DTOs;
 using Domain.Exceptions;
 using Domain.Models;
 using Application.Services.Booking;
 using Application.Services.Event;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventManager.Controllers;
@@ -54,6 +55,7 @@ public class EventsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ApiResult<bool>> AddEvent([FromBody] EventModel eventModel)
     {
         var result = await _eventService.AddEventAsync(eventModel);
@@ -72,6 +74,7 @@ public class EventsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ApiResult<bool>> ChangeEvent([FromRoute] int id, [FromBody] ChangeEventDto eventModelDto)
     {
         var eventModel = EventModel.Create(
@@ -98,6 +101,7 @@ public class EventsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ApiResult<bool>> DeleteEvent([FromRoute] int id)
     {
         var result = await _eventService.DeleteEventAsync(id);
@@ -116,10 +120,11 @@ public class EventsController : ControllerBase
     }
 
     [HttpPost("{eventId:int}/book")]
+    [Authorize]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ApiResult<BookingModel>> BookEvent([FromRoute] int eventId)
     {
-        var result = await _bookingService.CreateBookingAsync(eventId);
+        var result = await _bookingService.CreateBookingAsync(eventId, ResolveUserId());
 
         Response.Headers.Location = $"/bookings/{result.Id}";
 
@@ -130,5 +135,14 @@ public class EventsController : ControllerBase
             Message = $"Номер брони {result.Id}. Событие c id {result.EventId} забронировано со статусом {result.Status}",
             Data = result
         };
+    }
+
+    private Guid ResolveUserId()
+    {
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(raw, out var id))
+            throw new AccessDeniedException(Guid.Empty, "book");
+        return id;
     }
 }

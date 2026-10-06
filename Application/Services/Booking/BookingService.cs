@@ -8,6 +8,8 @@ namespace Application.Services.Booking;
 
 public class BookingService : IBookingService
 {
+    public const int ActiveBookingsLimit = 10;
+
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
     private readonly IEventRepository _events;
@@ -24,7 +26,7 @@ public class BookingService : IBookingService
         _logger = logger ?? NullLogger<BookingService>.Instance;
     }
 
-    public async Task<BookingModel> CreateBookingAsync(int eventId)
+    public async Task<BookingModel> CreateBookingAsync(int eventId, Guid userId)
     {
         await BookingLock.WaitAsync();
         try
@@ -33,10 +35,17 @@ public class BookingService : IBookingService
             if (ev is null)
                 throw new NotFoundException("Событие не найдено");
 
+            if (ev.StartAt <= DateTime.UtcNow)
+                throw new EventAlreadyPassedException(ev.Id, ev.StartAt);
+
+            var activeCount = await _bookings.CountActiveByUserAsync(userId);
+            if (activeCount >= ActiveBookingsLimit)
+                throw new ActiveBookingsLimitExceededException(userId, ActiveBookingsLimit);
+
             if (!ev.TryReserveSeats())
                 throw new NoAvailableSeatsException("Нет свободны мест для этого события");
 
-            var booking = BookingModel.Create(eventId);
+            var booking = BookingModel.Create(eventId, userId);
             await _bookings.AddAsync(booking);
             await _bookings.SaveChangesAsync();
             return booking;
@@ -47,9 +56,35 @@ public class BookingService : IBookingService
         }
     }
 
-    public Task<BookingModel?> GetBookingByIdAsync(Guid bookingId)
+    public async Task<BookingModel> CancelBookingAsync(Guid bookingId, Guid userId, bool isAdmin)
     {
-        return _bookings.GetByIdAsync(bookingId);
+        var booking = await _bookings.GetByIdAsync(bookingId);
+        if (booking is null)
+            throw new NotFoundException("Бронирование не найдено");
+
+        if (!isAdmin && booking.UserId != userId)
+            throw new AccessDeniedException(userId, "cancel");
+
+        booking.Cancel();
+
+        var ev = await _events.GetByIdAsync(booking.EventId);
+        if (ev is not null)
+            ev.ReleaseSeats();
+
+        await _bookings.SaveChangesAsync();
+        return booking;
+    }
+
+    public async Task<BookingModel?> GetBookingByIdAsync(Guid bookingId, Guid? userId = null, bool isAdmin = false)
+    {
+        var booking = await _bookings.GetByIdAsync(bookingId);
+        if (booking is null)
+            return null;
+
+        if (userId is not null && !isAdmin && booking.UserId != userId)
+            throw new AccessDeniedException(userId.Value, "get");
+
+        return booking;
     }
 
     public Task<IReadOnlyList<BookingModel>> GetPendingAsync()
