@@ -9,6 +9,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<EventModel> Events => Set<EventModel>();
     public DbSet<BookingModel> Bookings => Set<BookingModel>();
+    public DbSet<UserModel> Users => Set<UserModel>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

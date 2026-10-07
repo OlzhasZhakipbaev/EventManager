@@ -14,6 +14,7 @@ public class BookingRepositoryTests : IAsyncLifetime
     private AppDbContext _context = null!;
     private EventRepository _events = null!;
     private BookingRepository _bookings = null!;
+    private UserModel _user = null!;
 
     public BookingRepositoryTests(PostgresFixture fixture)
     {
@@ -39,6 +40,8 @@ public class BookingRepositoryTests : IAsyncLifetime
 
     private async Task SeedEvent(int id = 1)
     {
+        _user = UserModel.Create("user", "hash");
+        _context.Users.Add(_user);
         await _events.AddAsync(EventModel.Create(
             id,
             "Conference",
@@ -53,7 +56,7 @@ public class BookingRepositoryTests : IAsyncLifetime
     public async Task Add_Then_GetById_Returns_Saved_Booking()
     {
         await SeedEvent();
-        var booking = BookingModel.Create(1);
+        var booking = BookingModel.Create(1, _user.Id);
 
         await _bookings.AddAsync(booking);
         await _bookings.SaveChangesAsync();
@@ -77,8 +80,8 @@ public class BookingRepositoryTests : IAsyncLifetime
     public async Task GetPending_Returns_Only_Pending()
     {
         await SeedEvent();
-        var pending = BookingModel.Create(1);
-        var confirmed = BookingModel.Create(1);
+        var pending = BookingModel.Create(1, _user.Id);
+        var confirmed = BookingModel.Create(1, _user.Id);
         confirmed.Confirm();
 
         await _bookings.AddAsync(pending);
@@ -96,8 +99,8 @@ public class BookingRepositoryTests : IAsyncLifetime
     public async Task GetPendingIds_Returns_Only_Pending_Ids()
     {
         await SeedEvent();
-        var pending = BookingModel.Create(1);
-        var rejected = BookingModel.Create(1);
+        var pending = BookingModel.Create(1, _user.Id);
+        var rejected = BookingModel.Create(1, _user.Id);
         rejected.Reject();
 
         await _bookings.AddAsync(pending);
@@ -113,7 +116,7 @@ public class BookingRepositoryTests : IAsyncLifetime
     public async Task SaveChanges_Persists_Status_Update()
     {
         await SeedEvent();
-        var booking = BookingModel.Create(1);
+        var booking = BookingModel.Create(1, _user.Id);
         await _bookings.AddAsync(booking);
         await _bookings.SaveChangesAsync();
 
