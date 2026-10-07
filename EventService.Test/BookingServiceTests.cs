@@ -353,4 +353,67 @@ public class BookingServiceTests
         Assert.Equal(otherUserId, other.UserId);
         Assert.Equal(BookingStatus.Pending, other.Status);
     }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Cancel_Own_Booking()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+
+        var cancelled = await booking.CancelBookingAsync(created.Id, UserId, isAdmin: false);
+
+        Assert.Equal(BookingStatus.Cancelled, cancelled.Status);
+        Assert.NotNull(cancelled.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Throw_When_User_Cancels_Foreign_Booking()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+        var otherUserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        await Assert.ThrowsAsync<AccessDeniedException>(
+            () => booking.CancelBookingAsync(created.Id, otherUserId, isAdmin: false));
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Allow_Admin_To_Cancel_Foreign_Booking()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+        var adminId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+        var cancelled = await booking.CancelBookingAsync(created.Id, adminId, isAdmin: true);
+
+        Assert.Equal(BookingStatus.Cancelled, cancelled.Status);
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Throw_When_Already_Cancelled()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+        await booking.CancelBookingAsync(created.Id, UserId, isAdmin: false);
+
+        await Assert.ThrowsAsync<CancelledValidationException>(
+            () => booking.CancelBookingAsync(created.Id, UserId, isAdmin: false));
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Restore_AvailableSeats()
+    {
+        using var scope = CreateProvider(totalSeats: 5).CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var events = scope.ServiceProvider.GetRequiredService<IEventService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+
+        await booking.CancelBookingAsync(created.Id, UserId, isAdmin: false);
+
+        Assert.Equal(5, (await events.GetEventAsync(1))!.AvailableSeats);
+    }
 }

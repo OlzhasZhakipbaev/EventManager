@@ -68,9 +68,9 @@ public class GlobalExceptionHandlingMiddleware
             NoAvailableSeatsException => StatusCodes.Status409Conflict,
             AccessDeniedException => StatusCodes.Status403Forbidden,
             ActiveBookingsLimitExceededException => StatusCodes.Status409Conflict,
-            CancelledValidationException => StatusCodes.Status403Forbidden,
+            CancelledValidationException => StatusCodes.Status409Conflict,
             EventAlreadyPassedException => StatusCodes.Status400BadRequest,
-            InvalidCredentialsException => StatusCodes.Status401Unauthorized,
+            InvalidCredentialsException => StatusCodes.Status400BadRequest,
             DomainValidationException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };

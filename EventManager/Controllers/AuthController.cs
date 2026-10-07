@@ -21,20 +21,14 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<ApiResult<Guid>> Register([FromBody] RegisterUserDto dto)
+    public async Task<IActionResult> Register([FromBody] RegisterUserDto dto)
     {
         var role = Roles.User;
         if (!string.IsNullOrWhiteSpace(dto.Role) && Enum.TryParse<Roles>(dto.Role, true, out var parsed))
             role = parsed;
 
-        var user = await _users.RegisterAsync(dto.Login, dto.Password, role);
-        return new ApiResult<Guid>
-        {
-            Success = true,
-            StatusCode = HttpStatusCode.Created,
-            Message = "Пользователь зарегистрирован",
-            Data = user.Id
-        };
+        await _users.RegisterAsync(dto.Login, dto.Password, role);
+        return NoContent();
     }
 
     [HttpPost("login")]

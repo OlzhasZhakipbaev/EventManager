@@ -44,20 +44,14 @@ public class BookingController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    public async Task<ApiResult<BookingModel>> CancelBooking([FromRoute] Guid id)
+    public async Task<IActionResult> CancelBooking([FromRoute] Guid id)
     {
-        var result = await _bookingService.CancelBookingAsync(
+        await _bookingService.CancelBookingAsync(
             id,
             ResolveUserId(),
             User.IsInRole(nameof(Roles.Admin)));
 
-        return new ApiResult<BookingModel>
-        {
-            Success = true,
-            StatusCode = HttpStatusCode.OK,
-            Message = $"Бронь {result.Id} отменена",
-            Data = result
-        };
+        return NoContent();
     }
 
     private Guid ResolveUserId()
