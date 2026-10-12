@@ -13,18 +13,21 @@ namespace EventService.Test;
 
 public class BookingServiceTests
 {
-    private static EventModel CreateTestEvent(int totalSeats, int id = 1)
+    private static readonly Guid UserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+    private static EventModel CreateTestEvent(int totalSeats, int id = 1, DateTime? startAt = null)
     {
+        var start = startAt ?? DateTime.UtcNow.AddDays(1);
         return EventModel.Create(
             id,
             "Conference",
             "Desc",
-            DateTime.UtcNow.AddDays(1),
-            DateTime.UtcNow.AddDays(2),
+            start,
+            start.AddDays(1),
             totalSeats);
     }
 
-    private static IServiceProvider CreateProvider(int totalSeats = 10)
+    private static IServiceProvider CreateProvider(int totalSeats = 10, DateTime? startAt = null)
     {
         var dbName = Guid.NewGuid().ToString();
         var services = new ServiceCollection();
@@ -39,7 +42,7 @@ public class BookingServiceTests
 
         using var scope = provider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        context.Events.Add(CreateTestEvent(totalSeats));
+        context.Events.Add(CreateTestEvent(totalSeats, startAt: startAt));
         context.SaveChanges();
 
         return provider;
@@ -51,7 +54,7 @@ public class BookingServiceTests
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-        var result = await booking.CreateBookingAsync(1);
+        var result = await booking.CreateBookingAsync(1, UserId);
 
         Assert.NotEqual(Guid.Empty, result.Id);
         Assert.Equal(1, result.EventId);
@@ -66,7 +69,7 @@ public class BookingServiceTests
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var events = scope.ServiceProvider.GetRequiredService<IEventService>();
 
-        await booking.CreateBookingAsync(1);
+        await booking.CreateBookingAsync(1, UserId);
 
         Assert.Equal(4, (await events.GetEventAsync(1))!.AvailableSeats);
     }
@@ -78,9 +81,9 @@ public class BookingServiceTests
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var events = scope.ServiceProvider.GetRequiredService<IEventService>();
 
-        var first = await booking.CreateBookingAsync(1);
-        var second = await booking.CreateBookingAsync(1);
-        var third = await booking.CreateBookingAsync(1);
+        var first = await booking.CreateBookingAsync(1, UserId);
+        var second = await booking.CreateBookingAsync(1, UserId);
+        var third = await booking.CreateBookingAsync(1, UserId);
 
         Assert.Equal(3, new[] { first.Id, second.Id, third.Id }.Distinct().Count());
         Assert.Equal(0, (await events.GetEventAsync(1))!.AvailableSeats);
@@ -95,8 +98,8 @@ public class BookingServiceTests
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-        var first = await booking.CreateBookingAsync(1);
-        var second = await booking.CreateBookingAsync(1);
+        var first = await booking.CreateBookingAsync(1, UserId);
+        var second = await booking.CreateBookingAsync(1, UserId);
 
         Assert.NotEqual(first.Id, second.Id);
         Assert.Equal(1, first.EventId);
@@ -111,9 +114,9 @@ public class BookingServiceTests
         using var scope = CreateProvider(totalSeats: 1).CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-        await booking.CreateBookingAsync(1);
+        await booking.CreateBookingAsync(1, UserId);
 
-        await Assert.ThrowsAsync<NoAvailableSeatsException>(() => booking.CreateBookingAsync(1));
+        await Assert.ThrowsAsync<NoAvailableSeatsException>(() => booking.CreateBookingAsync(1, UserId));
     }
 
     [Fact]
@@ -121,7 +124,7 @@ public class BookingServiceTests
     {
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
-        var created = await booking.CreateBookingAsync(1);
+        var created = await booking.CreateBookingAsync(1, UserId);
 
         var result = await booking.GetBookingByIdAsync(created.Id);
 
@@ -136,7 +139,7 @@ public class BookingServiceTests
     {
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
-        var created = await booking.CreateBookingAsync(1);
+        var created = await booking.CreateBookingAsync(1, UserId);
 
         await booking.ProcessPendingAsync(CancellationToken.None);
 
@@ -152,7 +155,7 @@ public class BookingServiceTests
     {
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
-        var created = await booking.CreateBookingAsync(1);
+        var created = await booking.CreateBookingAsync(1, UserId);
 
         created.Confirm();
 
@@ -165,7 +168,7 @@ public class BookingServiceTests
     {
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
-        var created = await booking.CreateBookingAsync(1);
+        var created = await booking.CreateBookingAsync(1, UserId);
 
         created.Reject();
 
@@ -179,7 +182,7 @@ public class BookingServiceTests
         using var scope = CreateProvider(totalSeats: 3).CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var events = scope.ServiceProvider.GetRequiredService<IEventService>();
-        var created = await booking.CreateBookingAsync(1);
+        var created = await booking.CreateBookingAsync(1, UserId);
         var ev = await events.GetEventAsync(1);
 
         created.Reject();
@@ -194,12 +197,12 @@ public class BookingServiceTests
         using var scope = CreateProvider(totalSeats: 1).CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
         var events = scope.ServiceProvider.GetRequiredService<IEventService>();
-        var created = await booking.CreateBookingAsync(1);
+        var created = await booking.CreateBookingAsync(1, UserId);
 
         created.Reject();
         (await events.GetEventAsync(1))!.ReleaseSeats();
 
-        var next = await booking.CreateBookingAsync(1);
+        var next = await booking.CreateBookingAsync(1, UserId);
 
         Assert.NotEqual(created.Id, next.Id);
         Assert.Equal(BookingStatus.Pending, next.Status);
@@ -211,9 +214,9 @@ public class BookingServiceTests
     {
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
-        var created = await booking.CreateBookingAsync(1);
+        var created = await booking.CreateBookingAsync(1, UserId);
 
-        created.Status = BookingStatus.Rejected;
+        created.Reject();
 
         var result = await booking.GetBookingByIdAsync(created.Id);
 
@@ -227,7 +230,7 @@ public class BookingServiceTests
         using var scope = CreateProvider().CreateScope();
         var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-        await Assert.ThrowsAsync<NotFoundException>(() => booking.CreateBookingAsync(999));
+        await Assert.ThrowsAsync<NotFoundException>(() => booking.CreateBookingAsync(999, UserId));
     }
 
     [Fact]
@@ -238,7 +241,7 @@ public class BookingServiceTests
         var events = scope.ServiceProvider.GetRequiredService<IEventService>();
         await events.DeleteEventAsync(1);
 
-        await Assert.ThrowsAsync<NotFoundException>(() => booking.CreateBookingAsync(1));
+        await Assert.ThrowsAsync<NotFoundException>(() => booking.CreateBookingAsync(1, UserId));
     }
 
     [Fact]
@@ -249,7 +252,7 @@ public class BookingServiceTests
         var events = scope.ServiceProvider.GetRequiredService<IEventService>();
         (await events.GetEventAsync(1))!.AvailableSeats = 0;
 
-        await Assert.ThrowsAsync<NoAvailableSeatsException>(() => booking.CreateBookingAsync(1));
+        await Assert.ThrowsAsync<NoAvailableSeatsException>(() => booking.CreateBookingAsync(1, UserId));
     }
 
     [Fact]
@@ -275,7 +278,7 @@ public class BookingServiceTests
                 var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
                 try
                 {
-                    return await bookingService.CreateBookingAsync(1);
+                    return await bookingService.CreateBookingAsync(1, UserId);
                 }
                 catch (NoAvailableSeatsException)
                 {
@@ -304,12 +307,113 @@ public class BookingServiceTests
             {
                 using var scope = provider.CreateScope();
                 var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
-                return await bookingService.CreateBookingAsync(1);
+                return await bookingService.CreateBookingAsync(1, UserId);
             }));
 
         var results = await Task.WhenAll(tasks);
 
         Assert.Equal(10, results.Length);
         Assert.Equal(10, results.Select(x => x.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_Should_Throw_When_Event_Already_Started()
+    {
+        using var scope = CreateProvider(startAt: DateTime.UtcNow.AddHours(-1)).CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+        await Assert.ThrowsAsync<EventAlreadyPassedException>(() => booking.CreateBookingAsync(1, UserId));
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_Should_Throw_When_Active_Bookings_Limit_Reached()
+    {
+        using var scope = CreateProvider(totalSeats: 15).CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+        for (var i = 0; i < BookingService.ActiveBookingsLimit; i++)
+            await booking.CreateBookingAsync(1, UserId);
+
+        await Assert.ThrowsAsync<ActiveBookingsLimitExceededException>(
+            () => booking.CreateBookingAsync(1, UserId));
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_Should_Not_Apply_Other_Users_Active_Limit()
+    {
+        using var scope = CreateProvider(totalSeats: 15).CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var otherUserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        for (var i = 0; i < BookingService.ActiveBookingsLimit; i++)
+            await booking.CreateBookingAsync(1, UserId);
+
+        var other = await booking.CreateBookingAsync(1, otherUserId);
+
+        Assert.Equal(otherUserId, other.UserId);
+        Assert.Equal(BookingStatus.Pending, other.Status);
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Cancel_Own_Booking()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+
+        var cancelled = await booking.CancelBookingAsync(created.Id, UserId, isAdmin: false);
+
+        Assert.Equal(BookingStatus.Cancelled, cancelled.Status);
+        Assert.NotNull(cancelled.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Throw_When_User_Cancels_Foreign_Booking()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+        var otherUserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        await Assert.ThrowsAsync<AccessDeniedException>(
+            () => booking.CancelBookingAsync(created.Id, otherUserId, isAdmin: false));
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Allow_Admin_To_Cancel_Foreign_Booking()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+        var adminId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+        var cancelled = await booking.CancelBookingAsync(created.Id, adminId, isAdmin: true);
+
+        Assert.Equal(BookingStatus.Cancelled, cancelled.Status);
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Throw_When_Already_Cancelled()
+    {
+        using var scope = CreateProvider().CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+        await booking.CancelBookingAsync(created.Id, UserId, isAdmin: false);
+
+        await Assert.ThrowsAsync<CancelledValidationException>(
+            () => booking.CancelBookingAsync(created.Id, UserId, isAdmin: false));
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_Should_Restore_AvailableSeats()
+    {
+        using var scope = CreateProvider(totalSeats: 5).CreateScope();
+        var booking = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var events = scope.ServiceProvider.GetRequiredService<IEventService>();
+        var created = await booking.CreateBookingAsync(1, UserId);
+
+        await booking.CancelBookingAsync(created.Id, UserId, isAdmin: false);
+
+        Assert.Equal(5, (await events.GetEventAsync(1))!.AvailableSeats);
     }
 }

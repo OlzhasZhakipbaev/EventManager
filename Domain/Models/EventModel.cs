@@ -1,10 +1,11 @@
-
+using System.Text.Json.Serialization;
 using Domain.Exceptions;
 
 namespace Domain.Models;
 
 public class EventModel 
 {
+    [JsonConstructor]
     private EventModel()
     {
     }
@@ -28,6 +29,7 @@ public class EventModel
 
     public int AvailableSeats { get; set; }
     
+    [JsonIgnore]
     public ICollection<BookingModel> Bookings { get; set; } = [];
 
     public static EventModel Create(

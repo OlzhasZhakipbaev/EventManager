@@ -15,6 +15,10 @@ public class BookingConfiguration : IEntityTypeConfiguration<BookingModel>
             .HasColumnName("id")
             .ValueGeneratedNever();
 
+        builder.Property(b => b.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
+
         builder.Property(b => b.EventId)
             .HasColumnName("event_id")
             .IsRequired();
@@ -30,5 +34,9 @@ public class BookingConfiguration : IEntityTypeConfiguration<BookingModel>
         builder.HasOne(b => b.Event)
             .WithMany(e => e.Bookings)
             .HasForeignKey(b => b.EventId);
+
+        builder.HasOne(b => b.User)
+            .WithMany()
+            .HasForeignKey(b => b.UserId);
     }
 }
