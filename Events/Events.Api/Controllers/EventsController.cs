@@ -33,6 +33,18 @@ public class EventsController : ControllerBase
         };
     }
 
+    [HttpGet("top")]
+    public async Task<ApiResult<IReadOnlyList<EventModel>>> GetTop()
+    {
+        return new ApiResult<IReadOnlyList<EventModel>>
+        {
+            Success = true,
+            StatusCode = HttpStatusCode.OK,
+            Message = "Топ событий успешно получен",
+            Data = await _eventService.GetTopEventsAsync()
+        };
+    }
+
     [HttpGet("{id:int}")]
     public async Task<ApiResult<EventModel>> GetEvent([FromRoute] int id)
     {

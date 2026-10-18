@@ -61,6 +61,17 @@ public class EventRepository : IEventRepository
         _context.Events.Remove(eventModel);
     }
 
+    public async Task<IReadOnlyList<EventModel>> GetTopBySoldPercentAsync(int take, CancellationToken cancellationToken = default)
+    {
+        return await _context.Events
+            .OrderByDescending(e => e.TotalSeats == 0
+                ? 0d
+                : (double)(e.TotalSeats - e.AvailableSeats) / e.TotalSeats)
+            .ThenBy(e => e.Id)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _context.SaveChangesAsync(cancellationToken);

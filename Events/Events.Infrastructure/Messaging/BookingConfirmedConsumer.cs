@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Confluent.Kafka;
 using Contracts;
+using Events.Application.Caching;
 using Events.Application.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -143,5 +144,8 @@ public sealed class BookingConfirmedConsumer : BackgroundService
         }
 
         await events.SaveChangesAsync(cancellationToken);
+
+        var cache = scope.ServiceProvider.GetRequiredService<ICache>();
+        await cache.RemoveAsync(CacheKeys.Event(message.EventId), cancellationToken);
     }
 }

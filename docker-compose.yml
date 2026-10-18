@@ -1,2 +1,19 @@
 include:
   - docker-compose_14.yml
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: eventapi-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  events-api:
+    environment:
+      Redis__ConnectionString: redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
