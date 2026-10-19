@@ -45,6 +45,26 @@ JWT выдаёт только Users. Events и Bookings проверяют то�
 
 Если Redis недоступен, Events всё равно запускается: `AbortOnConnectFail` выключен, ошибки кеша пишутся в лог и не прерывают запрос. Чтение идёт в базу. Ответ медленнее, потому что клиент ждёт таймаут соединения.
 
+## Наблюдаемость
+
+Каждый API пишет логи в консоль одной JSON-строкой через Serilog и отдаёт телеметрию через OpenTelemetry.
+
+| Инструмент | Зачем | UI |
+|------------|--------|----|
+| Jaeger | Трейсы входящих HTTP-запросов, исходящих HTTP-вызовов и запросов EF Core | http://localhost:16686 |
+| Prometheus | Сбор метрик ASP.NET Core и рантайма .NET с `/metrics` | http://localhost:9090 |
+| Grafana | Дашборд latency, активных запросов и RPS | http://localhost:3000 |
+
+Логин Grafana — `admin`, пароль — `admin`. Внутри Docker сервисы шлют трейсы на `http://jaeger:4317`. С хоста OTLP-приёмник Jaeger доступен на порту `4317`. Prometheus забирает метрики по `prometheus.yml` с `users-service:8080`, `events-service:8080` и `bookings-service:8080`.
+
+Стек мониторинга поднимается вместе с остальной системой:
+
+```bash
+docker compose up -d --build
+```
+
+Дашборд лежит в `grafana/eventmanager-aspnet.json`. В Grafana добавьте источник Prometheus с адресом `http://prometheus:9090`, затем импортируйте этот JSON: Dashboards → New → Import.
+
 ## Запуск
 
 Нужен Docker.
@@ -53,7 +73,7 @@ JWT выдаёт только Users. Events и Bookings проверяют то�
 docker compose up -d --build
 ```
 
-Команда читает `docker-compose.yml`, который подключает `docker-compose_14.yml`: Zookeeper, Kafka, Redis, три базы PostgreSQL и три API. У Events строка подключения к Redis внутри сети — `redis:6379`. При старте каждый сервис применяет свою миграцию.
+Команда читает `docker-compose.yml`, который подключает `docker-compose_14.yml`: Zookeeper, Kafka, Redis, Prometheus, Jaeger, Grafana, три базы PostgreSQL и три API. У Events строка подключения к Redis внутри сети — `redis:6379`. При старте каждый сервис применяет свою миграцию.
 
 Swagger:
 
