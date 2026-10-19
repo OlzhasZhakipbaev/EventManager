@@ -15,5 +15,6 @@ public interface IEventRepository
         CancellationToken cancellationToken = default);
     Task AddAsync(EventModel eventModel, CancellationToken cancellationToken = default);
     void Remove(EventModel eventModel);
+    Task<IReadOnlyList<EventModel>> GetTopBySoldPercentAsync(int take, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -7,6 +7,7 @@ public interface IEventService
 {
     Task<PaginatedResultDto<EventModel>> GetEventsAsync(EventRequestDto request);
     Task<EventModel?> GetEventAsync(int id);
+    Task<IReadOnlyList<EventModel>> GetTopEventsAsync();
     Task<bool> AddEventAsync(EventModel eventModel);
     Task<bool> ChangeEventAsync(int id, EventModel eventModel);
     Task<bool> DeleteEventAsync(int id);
